@@ -10,7 +10,7 @@ class Homeview(ListView):
 
     model = models.Room
     paginate_orphans = 5
-    paginate_by = 10
+    paginate_by = 12
     context_object_name = "rooms"
 
 
