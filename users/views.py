@@ -42,7 +42,6 @@ class SignUpView(FormView):
         user = authenticate(self.request, username=email, password=password)
         if user is not None:
             login(self.request, user)
-        print(user, "user!!")
         user.verify_email()
         return super().form_valid(form)
 
@@ -83,7 +82,7 @@ def github_callback(request):
             result_json = result.json()
             error = result_json.get("error", None)
             if error is not None:
-                raise GithubException()
+                raise GithubException("can't get access token")
             else:
                 access_token = result_json.get("access_token")
                 profile_request = requests.get(
@@ -102,7 +101,9 @@ def github_callback(request):
                     try:
                         user = models.User.objects.get(email=email)
                         if user.login_method != models.User.LOGIN_GITHUB:
-                            raise GithubException()
+                            raise GithubException(
+                                f"please lon in with : {user.login_method}"
+                            )
                     except models.User.DoesNotExist:
                         user = models.User.objects.create(
                             email=email,
@@ -114,13 +115,15 @@ def github_callback(request):
                         )
                         user.set_unusable_password()
                         user.save()
+                    messages.success(request, f"welcome back f{user.first_name}")
                     login(request, user)
                     return redirect(reverse("core:home"))
                 else:
-                    raise GithubException()
+                    raise GithubException("cant get your profile")
         else:
-            raise GithubException()
-    except GithubException:
+            raise GithubException("can't get code")
+    except GithubException as e:
+        messages.error(request, e)
         return redirect(reverse("users:login"))
 
 
@@ -147,18 +150,17 @@ def kakao_callback(request):
         token_json = token_request.json()
         error = token_json.get("error", None)
         if error is not None:
-            raise KakaoException()
+            raise KakaoException("토큰에러")
         access_token = token_json.get("access_token")
         profile_request = requests.get(
             "https://kapi.kakao.com/v2/user/me",
             headers={"Authorization": f"Bearer {access_token}"},
         )
         profile_json = profile_request.json()
-        print(profile_json)
         kakao_account = profile_json.get("kakao_account")
         email = kakao_account.get("email", None)
         if email is None:
-            raise KakaoException()
+            raise KakaoException("이메일이 없습니다")
         profile = kakao_account.get("profile")
         nickname = profile.get("nickname")
         properties = profile_json.get("properties")
@@ -166,7 +168,7 @@ def kakao_callback(request):
         try:
             user = models.User.objects.get(email=email)
             if user.login_method != models.User.LOGIN_KAKAO:
-                raise KakaoException()
+                raise KakaoException(f"please log in with : {user.login_method}")
         except models.User.DoesNotExist:
             user = models.User.objects.create(
                 email=email,
@@ -183,7 +185,9 @@ def kakao_callback(request):
                 user.avatar.save(
                     f"{nickname}-avartar.jpg", ContentFile(photo_request.content)
                 )
+        messages.success(request, f"welcome back f{user.first_name}")
         login(request, user)
         return redirect(reverse("core:home"))
-    except KakaoException:
+    except KakaoException as e:
+        messages.error(request, e)
         return redirect(reverse("users:login"))
