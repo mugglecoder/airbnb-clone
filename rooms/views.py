@@ -91,8 +91,6 @@ class SearchView(View):
                 get_copy = request.GET.copy()
                 address = get_copy.pop("page", True) and get_copy.urlencode()
 
-                print(address)
-
                 return render(
                     request,
                     "rooms/search.html",
